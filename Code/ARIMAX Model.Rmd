@@ -1,0 +1,191 @@
+---
+title: "ARIMAX Moel"
+output: html_document
+date: "2024-06-19"
+---
+
+```{r}
+# Importing librarie
+library(dplyr)
+library(lubridate)
+library(zoo)
+library(tseries)
+library(aTSA)
+library(vars)
+library(ggplot2)
+library(tidyr)
+library(forecast)
+library(tseries)
+library(readr)
+
+
+
+
+# Load data-sets
+data_cpi <- read.csv("E:/4th Year - UOR/1st Sem/Time Series Analysis (4)/TS Project/Data sets/CPI.csv", header = T)
+data_rate <- read.csv("E:/4th Year - UOR/1st Sem/Time Series Analysis (4)/TS Project/Data sets/UNEMP.csv", header = T)
+
+
+
+# Convert date columns to Date type
+data_cpi$DATE <- as.Date(data_cpi$DATE)
+data_rate$DATE <- as.Date(data_rate$DATE)
+
+
+
+# Descriptive statistics about variables
+x1 <- data_rate$UNRATE
+y1 <- data_cpi$CPIAUCSL
+
+summary(x1)
+hist(x1)
+
+summary(y1)
+hist(y1)
+
+
+# Convert into time series data
+class(data_cpi)
+class(data_rate)
+
+
+tscpi <- ts(data_cpi, frequency = 12, start = c(1947,1))
+ts_cpi <- tscpi[,2]
+
+tsrate <- ts(data_rate, frequency = 12, start = c(1947,1))
+ts_rate <- tsrate[,2]
+
+plot(ts_cpi, xlab = "Years", ylab = "Customer Price Index (CPI)", main = "CPI in USA (1947 - 2023)", col="red")
+plot(ts_rate, xlab = "Years", ylab = "Unemployement Rate", main = "Unemployement Rate in USA (1947 - 2023)", col="blue")
+
+
+
+# Decompose the time series
+decom_cpi <- decompose(ts_cpi)
+plot(decom_cpi)
+
+decom_rate <- decompose(ts_rate)
+plot(decom_rate)
+
+
+
+# checking for stationarity 
+# Use ADF Test
+# Hypothesis : H0: Non- Stationary and  H1: Stationary 
+
+#check fo for CPI data
+adf.test(ts_cpi)
+# original data set doesn't reject(p-value > 0.05) cpi data set.So convert that cpi data into stationar using diffrence(1st difference)
+
+# check how much of differences are want to make these data stationar
+n1 <- ndiffs(ts_cpi)
+
+
+cpi_diff <- diff(ts_cpi, differences = n1)
+adf.test(cpi_diff)
+# p-value < 0.05 so now the cpi data is stationary
+
+
+#check fo for unemplyement rate data
+adf.test(ts_rate)
+
+# check how much of differences are want to make these data stationar
+n2 <- ndiffs(ts_rate)
+
+rate_diff <- diff(ts_cpi, differences = n2)
+adf.test(rate_diff)
+# p-value < 0.05 so now the unemp rate data(original data) is stationary
+
+
+
+
+
+cpi_diff <- diff(ts_cpi, differences = 1)
+plot(cpi_diff,xlab="Time",ylab="differencing CPI data", main="The plot of first differencing CPI data",col="red");abline(h=0)
+
+
+rate_diff <- diff(ts_rate, differences = 1)
+plot(rate_diff,xlab="Time",ylab="differencing rate data", main="The plot of first differencing unemployment rate data",col="blue");abline(h=0)
+
+
+
+
+
+###############  ACF and PACF PLots ##################
+#par(mfrow = c(1, 2))
+acf(cpi_diff)
+pacf(cpi_diff)
+
+
+acf(rate_diff)
+pacf(rate_diff)
+
+
+
+
+
+
+# Checking the linear relationship between data
+# fitting a linear model #####
+
+
+plot(x1,y1,xlab = "Rate of Unemployeement",ylab = "Customer Price Index (CPI)",main = "UnEmpRate vs CPI", col="green")
+model_1 <- lm(y1 ~ x1)
+summary(model)
+model_2 <- lm(x1 ~ y1)
+summary(model_2)
+plot(y1,x1,xlab = "Customer Price Index",ylab = "Unemployment Rate",main = "UnEmpRate vs CPI", col="pink")
+
+
+
+
+# The predictor unemployement rate is statistically significant, it does not provide a strong predictive power for CPI value in this model(Linear regression model). The model has limited practical usefulness due to its low R-squared value and large residual standard error.
+
+
+
+# Model Building
+# Spliting data set in to training and testing part
+train_size <- floor(0.8 * length(x1))
+train_rate <- x1[1:train_size]
+test_rate <- x1[(train_size + 1):length(x1)]
+train_cpi <- y1[1:train_size]
+test_cpi <- y1[(train_size + 1):length(y1)]
+
+
+
+
+
+# Fit the ARIMAX model on the training set
+# get xreg as "Unemployment rate"
+model_arimax_cpi <- auto.arima(train_cpi, xreg = train_rate)
+summary(model_arimax_cpi)
+
+
+
+
+# get xreg as "CPI"
+train_size_2 <- floor(0.8 * length(y1))
+train_cpi_2 <- y1[1:train_size]
+test_cpi_2 <- y1[(train_size + 1):length(y1)]
+train_rate_2 <- x1[1:train_size]
+est_rate_2 <- x1[(train_size + 1):length(x1)]
+
+model_arimax_rate <- auto.arima(train_rate_2, xreg = train_cpi_2)
+summary(model_arimax_rate)
+
+
+
+# Model Validation
+# Forecast on the test set
+forecast_arimax_cpi <- forecast(model_arimax_cpi, xreg = test_rate, h = length(test_cpi))
+plot(forecast_arimax_cpi, main = "ARIMAX Forecast CPI vs Actual")
+
+
+forecast_arimax_rate <- forecast(model_arimax_rate, xreg = test_cpi_2, h = length(test_rate_2))
+plot(forecast_arimax_rate, main = "ARIMAX Forecast Unemployment vs Actual")
+
+
+
+
+```
+
